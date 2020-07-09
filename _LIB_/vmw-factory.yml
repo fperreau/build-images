@@ -1,0 +1,4 @@
+---
+- name: "Create new {{ DOMAIN | upper }} template VM in {{ STORAGE }} storage."
+  debug:
+    msg: "Build VMware image in progress !"
