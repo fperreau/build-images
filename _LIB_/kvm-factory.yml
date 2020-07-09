@@ -20,8 +20,8 @@
     name: "{{ DOMAIN }}"
     command: status
   register: result
-  delay: 6
-  retries: 30
+  delay: 60
+  retries: 5
   until: result.status == "shutdown"
 - name: Get '{{ DOMAIN }}' disk image file.
   shell: virsh vol-list {{ STORAGE }} | grep {{ DOMAIN }} | awk '{print $2}'
