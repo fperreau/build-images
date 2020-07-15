@@ -1,11 +1,4 @@
 ---
-- name: debug TYPE
-  debug:
-    var: TYPE
-- name: debug TYPE_KVM_OEMDRV
-  debug:
-    var: TYPE_KVM_OEMDRV
-
 - name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
   template:
     src: "{{ NAME }}/{{ CFG }}"
@@ -30,25 +23,23 @@
     - TYPE_KVM_INITRD in TYPE
 
 ### TYPE-KVM-OEMDRV ###
-- name: Generate ISO image with Kickstart file.
-  command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
-  args:
-    chdir: "{{ NAME }}/build"
-    creates: "{{ NAME }}/oemdrv.iso"
-  when: TYPE_KVM_OEMDRV in TYPE
-- name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
-  command: |
-    virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
-      --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
-      --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
-      --noautoconsole
-  args:
-    chdir: "{{ NAME }}/build"
+- block:
+  - name: Generate ISO image with Kickstart file.
+    command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
+    args:
+      chdir: "{{ NAME }}/build"
+  - name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
+    command: |
+      virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
+        --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+        --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
+        --noautoconsole
+    args:
+      chdir: "{{ NAME }}/build"
   when: 
     - not DOMAIN in domain_list.list_vms
     - TYPE_KVM_OEMDRV in TYPE
 
-### COMPRESS BUILD IMAGE ###
 - name: Waiting {{ DOMAIN }} domain is shutdown.
   virt: 
     name: "{{ DOMAIN }}"
@@ -57,6 +48,8 @@
   delay: 60
   retries: 10
   until: result.status == "shutdown"
+
+### COMPRESS BUILD IMAGE ###
 - name: Sparsify and compress '{{ DOMAIN }}' image domain to build repository.
   shell: virt-sparsify --convert qcow2 --compress {{ IMG }} {{ NAME }}/build/{{ NAME }}.img
   args:
@@ -67,3 +60,10 @@
     owner: perreau
     group: kvm
     recurse: yes
+
+### CLEAN ###
+- name: Clean DOMAIN
+  virt:
+    name: "{{ DOMAIN }}"
+    command: undefine
+
