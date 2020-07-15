@@ -1,32 +1,69 @@
 ---
+- name: debug TYPE
+  debug:
+    var: TYPE
+- name: debug TYPE_KVM_OEMDRV
+  debug:
+    var: TYPE_KVM_OEMDRV
+
 - name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
   template:
     src: "{{ NAME }}/{{ CFG }}"
     dest: "{{ NAME }}/build/{{ CFG }}"
+
 - name: Get list of domains.
   virt:
     command: list_vms
   register: domain_list
-- name: Build new '{{ DOMAIN }}' image domain in {{ STORAGE }} storage.
+
+### TYPE-KVM-INITRD ###
+- name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" injected in "initrd".
   command: |
     virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
-      --disk pool={{ STORAGE }},size={{ SIZE }} --location {{ ISO }} \
-      --initrd-inject {{ NAME }}/build/{{ CFG }} \
-      --extra-args "inst.ks=file:/{{ CFG }}" \
+      --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+      --initrd-inject {{ CFG }} --extra-args "inst.ks=file:/{{ CFG }}" \
       --noautoconsole
-  when: not DOMAIN in domain_list.list_vms
+  args:
+    chdir: "{{ NAME }}/build"
+  when: 
+    - not DOMAIN in domain_list.list_vms
+    - TYPE_KVM_INITRD in TYPE
+
+### TYPE-KVM-OEMDRV ###
+- name: Generate ISO image with Kickstart file.
+  command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
+  args:
+    chdir: "{{ NAME }}/build"
+    creates: "{{ NAME }}/oemdrv.iso"
+  when: TYPE_KVM_OEMDRV in TYPE
+- name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
+  command: |
+    virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
+      --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+      --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
+      --noautoconsole
+  args:
+    chdir: "{{ NAME }}/build"
+  when: 
+    - not DOMAIN in domain_list.list_vms
+    - TYPE_KVM_OEMDRV in TYPE
+
+### COMPRESS BUILD IMAGE ###
 - name: Waiting {{ DOMAIN }} domain is shutdown.
   virt: 
     name: "{{ DOMAIN }}"
     command: status
   register: result
   delay: 60
-  retries: 5
+  retries: 10
   until: result.status == "shutdown"
-- name: Get '{{ DOMAIN }}' disk image file.
-  shell: virsh vol-list {{ STORAGE }} | grep {{ DOMAIN }} | awk '{print $2}'
-  register: result
 - name: Sparsify and compress '{{ DOMAIN }}' image domain to build repository.
-  shell: virt-sparsify -x -v --compress {{ result.stdout }} {{ NAME }}/build/{{ NAME }}.img
+  shell: virt-sparsify --convert qcow2 --compress {{ IMG }} {{ NAME }}/build/{{ NAME }}.img
   args:
     creates: "{{ NAME }}/build/{{ NAME }}.img"
+- name: Change build owner.
+  file:
+    path: "{{ NAME }}/build"
+    owner: perreau
+    group: kvm
+    recurse: yes

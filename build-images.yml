@@ -14,23 +14,35 @@
         cfg: ks.cfg
         size: 10
         iso: REDHAT/rhel-8.2-x86_64-dvd.iso
-        os: { kvm: "rhel8.2", vmw: "" }
+        os:
+          kvm: "rhel8.2"
+          vmw: "" 
+        type:
+          - "{{ TYPE_KVM_OEMDRV }}"
       ubuntu2004:
         cfg: preseed.cfg
         size: 10
         iso: UBUNTU/ubuntu-20.04-live-server-amd64.iso
         os: { kvm: "ubuntu20.04", vmw: "" }
-    
+        type:
+          - "{{ TYPE_KVM_OEMDRV }}"
+          - "{{ TYPE_VMW_OEMDRV }}"
+
+    TYPE_KVM_INITRD: 1
+    TYPE_KVM_OEMDRV: 2
+    TYPE_VMW_OEMDRV: 4
+
     NAME: "{{ item }}"
-    DOMAIN: "img_{{ item }}"
+    DOMAIN: "{{ item }}"
+    TYPE: "{{ CONFIG[item].type }}"
     CFG: "{{ CONFIG[item].cfg }}"
     SIZE: "{{ CONFIG[item].size }}"
     ISO: "{{ ISO_DIR }}/{{ CONFIG[item].iso }}"
+    IMG: "{{ KVM_DIR }}/{{ NAME }}.img"
     OS: "{{ CONFIG[item].os }}"
 
     ISO_DIR: /mnt/depot/iso
-    STORAGE: VM2
-
+    KVM_DIR: /mnt/vm2/kvm-pool
 
   tasks:
 
