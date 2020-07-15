@@ -62,8 +62,6 @@
     recurse: yes
 
 ### CLEAN ###
-- name: Clean DOMAIN
-  virt:
-    name: "{{ DOMAIN }}"
-    command: undefine
+#- name: Clean DOMAIN
+#  command: virsh undefine --remove-all-storage
 
