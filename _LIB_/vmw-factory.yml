@@ -1,4 +1,7 @@
 ---
+#
+# GENERATE AUTO INSTALL ISO
+#
 - name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
   template:
     src: "{{ NAME }}/{{ CFG }}"
@@ -24,51 +27,71 @@
     path: "{{ VMW_DIR }}/{{ KS_ISO }}"
   when: result is changed
 
-- name: Create auto install server '{{ DOMAIN | upper }}'.
-  vmware_guest:
-    hostname: "{{ vcenter }}"
-    username: "{{ username }}"
-    password: "{{ password }}"
-    datacenter: "{{ datacenter }}"
-    esxi_hostname: "{{ esxhost }}"
-    validate_certs: "{{ validate_certs }}"
-    folder: "{{ folder }}"
-    name: "{{ DOMAIN }}"
-    #state: poweredoff
-    guest_id: "{{ OS.vmw }}"
-    disk:
-      - size_gb: "{{ SIZE }}"
-        datastore: "{{ datastore }}"
-        thin:
-    cdrom:
-      - type: iso
-        iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ ISO }}"
-        controller_number: 0
-        unit_number: 0
-      - type: iso
-        iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ KS_ISO }}"
-        controller_number: 0
-        unit_number: 1
-    networks:
-      - name: VM Network
-    wait_for_ip_address: yes
-    hardware:
-      num_cpus: 2
-      memory_mb: 2048
-      boot_firmware: bios
-- name: Set '{{ DOMAIN | upper }}' server to template.
-  vmware_guest:
-    hostname: "{{ vcenter }}"
-    username: "{{ username }}"
-    password: "{{ password }}"
-    datacenter: "{{ datacenter }}"
-    esxi_hostname: "{{ esxhost }}"
-    validate_certs: "{{ validate_certs }}"
-    folder: "{{ folder }}"
-    name: "{{ DOMAIN }}"
-    is_template: true
+#
+# CREATE TEMPLATE IMAGE
+#
+- name: Checking domain locked '{{ NAME }}/build/{{ DOMAIN }}.lock'.
+  stat:
+    path: "{{ NAME }}/build/{{ DOMAIN }}.lock"
+  register: domain_lock 
+- block:
+  - name: Create auto install server '{{ DOMAIN | upper }}'.
+    vmware_guest:
+      hostname: "{{ vcenter }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      datacenter: "{{ datacenter }}"
+      esxi_hostname: "{{ esxhost }}"
+      validate_certs: "{{ validate_certs }}"
+      folder: "{{ folder }}"
+      name: "{{ DOMAIN }}"
+      state: present
+      guest_id: "{{ OS.vmw }}"
+      disk:
+        - size_gb: "{{ SIZE }}"
+          datastore: "{{ datastore }}"
+          thin:
+      cdrom:
+        - type: iso
+          iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ ISO }}"
+          controller_number: 0
+          unit_number: 0
+        - type: iso
+          iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ KS_ISO }}"
+          controller_number: 0
+          unit_number: 1
+      networks:
+        - name: VM Network
+      wait_for_ip_address: yes
+      hardware:
+        num_cpus: 2
+        memory_mb: 2048
+        boot_firmware: bios
+  - name: Set '{{ DOMAIN | upper }}' server to template.
+    vmware_guest:
+      hostname: "{{ vcenter }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      datacenter: "{{ datacenter }}"
+      esxi_hostname: "{{ esxhost }}"
+      validate_certs: "{{ validate_certs }}"
+      folder: "{{ folder }}"
+      name: "{{ DOMAIN }}"
+      is_template: true
+  - name: Locked existing domain '{{ NAME }}/build/{{ DOMAIN }}.lock'.
+    file:
+      path: "{{ NAME }}/build/{{ DOMAIN }}.lock"
+      state: touch
+  when: not domain_lock.stat.exists
 
-- name: Export OVF in '{{ NAME }}/build/ovf' directory.
+#
+# EXPORT OVA TEMPLATE IMAGE
+#
+- name: Check if OVA exist.
+  stat:
+    path: "{{ NAME }}/build/{{ NAME }}.ova"
+  register: ova_file
+- name: Export OVF in '{{ NAME }}/build/{{ DOMAIN }}' directory.
   vmware_export_ovf:
     datacenter: "{{ datacenter }}"
     hostname: "{{ vcenter }}"
@@ -78,13 +101,15 @@
     name: "{{ DOMAIN  }}"
     export_with_images: false
     export_dir: "{{ NAME }}/build"
+  when: not ova_file.stat.exists
 - name: Create OVA in '{{ NAME }}/build' directory.
   shell: |
-    tar -C {{ DOMAIN }} -cvf ../{{ NAME }}.ova *
-    rm -f {{ DOMAIN }}
+    tar -C {{ DOMAIN }} -cvSf {{ NAME }}.ova .
+    rm -rf {{ DOMAIN }}
   args:
     chdir: "{{ NAME }}/build"
     creates: "{{ NAME }}.ova"
+  warn: false
 - name: Change build owner.
   file:
     path: "{{ NAME }}/build/"
@@ -92,6 +117,9 @@
     group: kvm
     recurse: yes
 
+#
+# CLEAN
+#
 - name: Delete template '{{ DOMAIN | upper }}'.
   vmware_guest:
     hostname: "{{ vcenter }}"
@@ -104,4 +132,3 @@
     name: "{{ DOMAIN }}"
     state: absent
   when: DELETE_IMAGES
-

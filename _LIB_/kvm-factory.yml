@@ -1,16 +1,26 @@
 ---
+#
+# GENERATE AUTO INSTALL ISO
+#
 - name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
   template:
     src: "{{ NAME }}/{{ CFG }}"
     dest: "{{ NAME }}/build/{{ CFG }}"
   vars:
     DISK: vda
+- name: Generate ISO image with Kickstart file.
+  command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
+  args:
+    chdir: "{{ NAME }}/build"
+  when: PROVISION == "KVM"
 
+#
+# CREATE TEMPLATE IMAGE
+#
 - name: Get list of domains.
   virt:
     command: list_vms
-  register: domain_list
-  
+  register: domain_list  
 - name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" injected in "initrd".
   command: |
     virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
@@ -22,23 +32,17 @@
   when:
     - not DOMAIN in domain_list.list_vms
     - PROVISION == "KVM_INITRD"
-
-- block:
-  - name: Generate ISO image with Kickstart file.
-    command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
-    args:
-      chdir: "{{ NAME }}/build"
-  - name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
-    command: |
-      virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
-        --location {{ ISO_DIR }}/{{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
-        --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
-        --noautoconsole
-    args:
-      chdir: "{{ NAME }}/build"
-  when: 
-    - not DOMAIN in domain_list.list_vms
-    - PROVISION == "KVM"
+- name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
+  command: |
+    virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
+      --location {{ ISO_DIR }}/{{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+      --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
+      --noautoconsole
+  args:
+    chdir: "{{ NAME }}/build"
+when: 
+  - not DOMAIN in domain_list.list_vms
+  - PROVISION == "KVM"
 
 - name: Waiting {{ DOMAIN }} domain is shutdown.
   virt: 
@@ -49,8 +53,11 @@
   retries: 10
   until: result.status == "shutdown"
 
+#
+# EXPORT KVM TEMPLATE IMAGE
+#
 - name: Sparsify and compress '{{ DOMAIN }}' image domain to build repository.
-  shell: virt-sparsify --convert qcow2 --compress {{ IMG }} {{ NAME }}/build/{{ NAME }}.img
+  command: virt-sparsify --convert qcow2 --compress {{ IMG }} {{ NAME }}/build/{{ NAME }}.img
   args:
     creates: "{{ NAME }}/build/{{ NAME }}.img"
 - name: Change build owner.
@@ -60,7 +67,9 @@
     group: kvm
     recurse: yes
 
-- name: Clean DOMAIN
+#
+# CLEAN
+#
+- name: Clean DOMAIN.
   command: virsh undefine --remove-all-storage
-  when: DELETE_IMAGES  
-
+  when: DELETE_IMAGES
