@@ -2,3 +2,15 @@
 - name: "Create new {{ DOMAIN | upper }} template VM in {{ STORAGE }} storage."
   debug:
     msg: "Build VMware image in progress !"
+
+- name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
+  template:
+    src: "{{ NAME }}/{{ CFG }}"
+    dest: "{{ NAME }}/build/{{ CFG }}"
+  vars:
+    DISK: sda
+
+- name: Generate ISO image with Kickstart file.
+  command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
+  args:
+    chdir: "{{ NAME }}/build"

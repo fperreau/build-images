@@ -3,6 +3,8 @@
   template:
     src: "{{ NAME }}/{{ CFG }}"
     dest: "{{ NAME }}/build/{{ CFG }}"
+  vars:
+    DISK: vda
 
 - name: Get list of domains.
   virt:
@@ -18,9 +20,9 @@
       --noautoconsole
   args:
     chdir: "{{ NAME }}/build"
-  when: 
+  when:
     - not DOMAIN in domain_list.list_vms
-    - TYPE_KVM_INITRD in TYPE
+    - PROVISION == "KVM_INITRD"
 
 ### TYPE-KVM-OEMDRV ###
 - block:
@@ -38,7 +40,7 @@
       chdir: "{{ NAME }}/build"
   when: 
     - not DOMAIN in domain_list.list_vms
-    - TYPE_KVM_OEMDRV in TYPE
+    - PROVISION == "KVM"
 
 - name: Waiting {{ DOMAIN }} domain is shutdown.
   virt: 
@@ -56,7 +58,7 @@
     creates: "{{ NAME }}/build/{{ NAME }}.img"
 - name: Change build owner.
   file:
-    path: "{{ NAME }}/build"
+    path: "{{ NAME }}/build/"
     owner: perreau
     group: kvm
     recurse: yes

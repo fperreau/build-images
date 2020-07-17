@@ -5,6 +5,8 @@
   become: true
   
   vars:
+    PROVISION: KVM
+
     IMAGE:
       - rhel8
 #     - ubuntu2004
@@ -14,19 +16,12 @@
         cfg: ks.cfg
         size: 10
         iso: REDHAT/rhel-8.2-x86_64-dvd.iso
-        os:
-          kvm: "rhel8.2"
-          vmw: "" 
-        type:
-          - "{{ TYPE_KVM_OEMDRV }}"
+        os: { kvm: "rhel8.2", vmw: "undefine"  }
       ubuntu2004:
         cfg: preseed.cfg
         size: 10
         iso: UBUNTU/ubuntu-20.04-live-server-amd64.iso
-        os: { kvm: "ubuntu20.04", vmw: "" }
-        type:
-          - "{{ TYPE_KVM_OEMDRV }}"
-          - "{{ TYPE_VMW_OEMDRV }}"
+        os: { kvm: "ubuntu20.04", vmw: "undefine" }
 
     TYPE_KVM_INITRD: 1
     TYPE_KVM_OEMDRV: 2
@@ -49,7 +44,9 @@
   - name: Building KVM images.
     include_tasks: "_LIB_/kvm-factory.yml"
     with_items: "{{ IMAGE }}"
+    when: PROVISION=="KVM"
 
   - name: Building VMware images.
     include_tasks: "_LIB_/vmw-factory.yml"
     with_items: "{{ IMAGE }}"
+    when: PROVISION=="VMW"
