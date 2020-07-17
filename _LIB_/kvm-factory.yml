@@ -10,12 +10,11 @@
   virt:
     command: list_vms
   register: domain_list
-
-### TYPE-KVM-INITRD ###
+  
 - name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" injected in "initrd".
   command: |
     virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
-      --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+      --location {{ ISO_DIR }}/{{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
       --initrd-inject {{ CFG }} --extra-args "inst.ks=file:/{{ CFG }}" \
       --noautoconsole
   args:
@@ -24,7 +23,6 @@
     - not DOMAIN in domain_list.list_vms
     - PROVISION == "KVM_INITRD"
 
-### TYPE-KVM-OEMDRV ###
 - block:
   - name: Generate ISO image with Kickstart file.
     command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
@@ -33,7 +31,7 @@
   - name: Build new '{{ DOMAIN }}' image domain from "/ks.cfg" included in OEMDRV cdrom.
     command: |
       virt-install --name {{ DOMAIN }} --os-variant {{ OS.kvm }} --vcpus 2 --ram 2048 \
-        --location {{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
+        --location {{ ISO_DIR }}/{{ ISO }} --disk {{ IMG }},size={{ SIZE }} \
         --disk oemdrv.iso,device=cdrom,bus=sata --extra-args "inst.ks=cdrom:LABEL=OEMDRV:/{{ CFG }}" \
         --noautoconsole
     args:
@@ -51,7 +49,6 @@
   retries: 10
   until: result.status == "shutdown"
 
-### COMPRESS BUILD IMAGE ###
 - name: Sparsify and compress '{{ DOMAIN }}' image domain to build repository.
   shell: virt-sparsify --convert qcow2 --compress {{ IMG }} {{ NAME }}/build/{{ NAME }}.img
   args:
@@ -63,7 +60,7 @@
     group: kvm
     recurse: yes
 
-### CLEAN ###
-#- name: Clean DOMAIN
-#  command: virsh undefine --remove-all-storage
+- name: Clean DOMAIN
+  command: virsh undefine --remove-all-storage
+  when: DELETE_IMAGES  
 

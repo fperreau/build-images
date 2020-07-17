@@ -5,7 +5,8 @@
   become: true
   
   vars:
-    PROVISION: KVM
+    PROVISION: VMW    # KVM, KVM_INITRD
+    DELETE_IMAGES: false
 
     IMAGE:
       - rhel8
@@ -16,28 +17,35 @@
         cfg: ks.cfg
         size: 10
         iso: REDHAT/rhel-8.2-x86_64-dvd.iso
-        os: { kvm: "rhel8.2", vmw: "undefine"  }
+        os: { kvm: "rhel8.2", vmw: "rhel8_64Guest"  }
       ubuntu2004:
         cfg: preseed.cfg
         size: 10
         iso: UBUNTU/ubuntu-20.04-live-server-amd64.iso
-        os: { kvm: "ubuntu20.04", vmw: "undefine" }
-
-    TYPE_KVM_INITRD: 1
-    TYPE_KVM_OEMDRV: 2
-    TYPE_VMW_OEMDRV: 4
+        os: { kvm: "ubuntu20.04", vmw: "ubuntu64Guest" }
 
     NAME: "{{ item }}"
     DOMAIN: "{{ item }}"
     TYPE: "{{ CONFIG[item].type }}"
     CFG: "{{ CONFIG[item].cfg }}"
     SIZE: "{{ CONFIG[item].size }}"
-    ISO: "{{ ISO_DIR }}/{{ CONFIG[item].iso }}"
+    ISO: "{{ CONFIG[item].iso }}"
     IMG: "{{ KVM_DIR }}/{{ NAME }}.img"
     OS: "{{ CONFIG[item].os }}"
 
     ISO_DIR: /mnt/depot/iso
     KVM_DIR: /mnt/vm2/kvm-pool
+    VMW_DIR: /depot
+    KS_ISO: "{{ NAME }}-oemdrv.iso"
+
+    username: administrator@vsphere.local
+    password: Passw0rd!
+    vcenter: vcsa
+    esxhost: 192.168.1.98
+    datacenter: FPX
+    datastore: DS01
+    folder: template
+    validate_certs: false
 
   tasks:
 

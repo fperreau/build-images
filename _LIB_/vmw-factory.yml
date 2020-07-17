@@ -1,16 +1,107 @@
 ---
-- name: "Create new {{ DOMAIN | upper }} template VM in {{ STORAGE }} storage."
-  debug:
-    msg: "Build VMware image in progress !"
-
 - name: Generate configuration file '{{ DOMAIN }}/{{ CFG }}'.
   template:
     src: "{{ NAME }}/{{ CFG }}"
     dest: "{{ NAME }}/build/{{ CFG }}"
   vars:
     DISK: sda
-
-- name: Generate ISO image with Kickstart file.
-  command: genisoimage -V OEMDRV -o oemdrv.iso {{ CFG }}
+  register: result
+- name: Generate ISO image with AutoInstall file.
+  command: genisoimage -V OEMDRV -o {{ KS_ISO }} {{ CFG }}
   args:
     chdir: "{{ NAME }}/build"
+    creates: "{{ KS_ISO }}"
+  when: result is changed
+- name: Copy auto install ISO in datastore.
+  vsphere_copy:
+    datacenter: "{{ datacenter }}"
+    datastore: "{{ datastore }}"
+    hostname: "{{ vcenter }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    validate_certs: false
+    src: "{{ NAME }}/build/{{ KS_ISO }}"
+    path: "{{ VMW_DIR }}/{{ KS_ISO }}"
+  when: result is changed
+
+- name: Create auto install server '{{ DOMAIN | upper }}'.
+  vmware_guest:
+    hostname: "{{ vcenter }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    datacenter: "{{ datacenter }}"
+    esxi_hostname: "{{ esxhost }}"
+    validate_certs: "{{ validate_certs }}"
+    folder: "{{ folder }}"
+    name: "{{ DOMAIN }}"
+    #state: poweredoff
+    guest_id: "{{ OS.vmw }}"
+    disk:
+      - size_gb: "{{ SIZE }}"
+        datastore: "{{ datastore }}"
+        thin:
+    cdrom:
+      - type: iso
+        iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ ISO }}"
+        controller_number: 0
+        unit_number: 0
+      - type: iso
+        iso_path: "[{{ datastore }}] {{ VMW_DIR }}/{{ KS_ISO }}"
+        controller_number: 0
+        unit_number: 1
+    networks:
+      - name: VM Network
+    wait_for_ip_address: yes
+    hardware:
+      num_cpus: 2
+      memory_mb: 2048
+      boot_firmware: bios
+- name: Set '{{ DOMAIN | upper }}' server to template.
+  vmware_guest:
+    hostname: "{{ vcenter }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    datacenter: "{{ datacenter }}"
+    esxi_hostname: "{{ esxhost }}"
+    validate_certs: "{{ validate_certs }}"
+    folder: "{{ folder }}"
+    name: "{{ DOMAIN }}"
+    is_template: true
+
+- name: Export OVF in '{{ NAME }}/build/ovf' directory.
+  vmware_export_ovf:
+    datacenter: "{{ datacenter }}"
+    hostname: "{{ vcenter }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    validate_certs: false
+    name: "{{ DOMAIN  }}"
+    export_with_images: false
+    export_dir: "{{ NAME }}/build"
+- name: Create OVA in '{{ NAME }}/build' directory.
+  shell: |
+    tar -C {{ DOMAIN }} -cvf ../{{ NAME }}.ova *
+    rm -f {{ DOMAIN }}
+  args:
+    chdir: "{{ NAME }}/build"
+    creates: "{{ NAME }}.ova"
+- name: Change build owner.
+  file:
+    path: "{{ NAME }}/build/"
+    owner: perreau
+    group: kvm
+    recurse: yes
+
+- name: Delete template '{{ DOMAIN | upper }}'.
+  vmware_guest:
+    hostname: "{{ vcenter }}"
+    username: "{{ username }}"
+    password: "{{ password }}"
+    datacenter: "{{ datacenter }}"
+    esxi_hostname: "{{ esxhost }}"
+    validate_certs: "{{ validate_certs }}"
+    folder: "{{ folder }}"
+    name: "{{ DOMAIN }}"
+    state: absent
+  when: DELETE_IMAGES
+
