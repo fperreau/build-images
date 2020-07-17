@@ -40,9 +40,9 @@
       --noautoconsole
   args:
     chdir: "{{ NAME }}/build"
-when: 
-  - not DOMAIN in domain_list.list_vms
-  - PROVISION == "KVM"
+  when: 
+    - not DOMAIN in domain_list.list_vms
+    - PROVISION == "KVM"
 
 - name: Waiting {{ DOMAIN }} domain is shutdown.
   virt: 
