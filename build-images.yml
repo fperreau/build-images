@@ -40,9 +40,9 @@
 
     username: administrator@vsphere.local
     password: Passw0rd!
-    vcenter: vcsa
+    vcenter: 192.168.1.97
     esxhost: 192.168.1.98
-    datacenter: FPX
+    datacenter: LAB
     datastore: DS01
     folder: template
     validate_certs: false

@@ -67,6 +67,21 @@
         num_cpus: 2
         memory_mb: 2048
         boot_firmware: bios
+  - name: Unattach 1er cdrom and remove 2nd cdrom of server '{{ DOMAIN | upper }}'.
+    vmware_guest:
+      hostname: "{{ vcenter }}"
+      username: "{{ username }}"
+      password: "{{ password }}"
+      name: "{{ DOMAIN }}"
+      validate_certs: "{{ validate_certs }}"
+      cdrom:
+        - type: none
+          controller_number: 0
+          unit_number: 0
+        - type: none
+          controller_number: 0
+          unit_number: 1
+          state: absent
   - name: Set '{{ DOMAIN | upper }}' server to template.
     vmware_guest:
       hostname: "{{ vcenter }}"
@@ -103,13 +118,15 @@
     export_dir: "{{ NAME }}/build"
   when: not ova_file.stat.exists
 - name: Create OVA in '{{ NAME }}/build' directory.
-  shell: |
-    tar -C {{ DOMAIN }} -cvSf {{ NAME }}.ova .
-    rm -rf {{ DOMAIN }}
+  shell: tar -cvSf ../{{ NAME }}.ova *
   args:
-    chdir: "{{ NAME }}/build"
+    chdir: "{{ NAME }}/build/{{ NAME }}"
     creates: "{{ NAME }}.ova"
-  warn: false
+    warn: false
+- name: Remove OVF files server.
+  file:
+    path: "{{ NAME }}/build/{{ NAME }}"
+    state: absent
 - name: Change build owner.
   file:
     path: "{{ NAME }}/build/"
