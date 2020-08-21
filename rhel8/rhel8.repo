@@ -1,3 +1,4 @@
+[InstallMedia-BaseOS]
 name=Red Hat Enterprise Linux 8 - BaseOS
 metadata_expire=-1
 gpgcheck=1

@@ -9,7 +9,7 @@
     DELETE_IMAGES: false
 
     IMAGE:
-      - rhel8
+      - rhel7
 #     - ubuntu2004
     
     CONFIG:
@@ -18,6 +18,11 @@
         size: 10
         iso: REDHAT/rhel-8.2-x86_64-dvd.iso
         os: { kvm: "rhel8.2", vmw: "rhel8_64Guest"  }
+      rhel7:
+        cfg: ks.cfg
+        size: 10
+        iso: REDHAT/rhel-7.8-x86_64-dvd.iso
+        os: { kvm: "rhel7.8", vmw: "rhel7_64Guest"  }
       ubuntu2004:
         cfg: preseed.cfg
         size: 10
